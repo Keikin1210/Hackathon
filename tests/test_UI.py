@@ -1,15 +1,8 @@
 import streamlit as st
-import requests
 import time
 import random
 from datetime import datetime
 import time
-
-# st.sesson_state.messagesを保存、保存ファイルの読み込み用
-from save_load import save_chat, load_chat, reset_chat
-
-# --- 設定 ---
-BACKEND_URL = "http://127.0.0.1:8000/generate_minutes"
 
 st.set_page_config(page_title="トーク", page_icon="💬")
 
@@ -29,9 +22,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 if "messages" not in st.session_state:
-    # 過去の会話履歴を読み込む
-        st.session_state.messages = load_chat()
-    # st.session_state.messages = []
+    st.session_state.messages = []
 if "response_index" not in st.session_state:
     st.session_state.response_index = 0
 
@@ -69,11 +60,10 @@ def buddy_typing(text):
             # 友達がスマホを打つようなランダムな速さ
             time.sleep(random.uniform(0.02, 0.06))
         placeholder.markdown(full_response)
-    # retrun full_response
-
         now = datetime.now()
         current_time = now.strftime("%Y-%m-%d %H:%M:%S")
     return full_response, current_time
+
 
 # 履歴表示
 for message in st.session_state.messages:
@@ -83,7 +73,6 @@ for message in st.session_state.messages:
     time_str = message.get("time", "")
 
     with st.chat_message(message["role"], avatar=avatar):
-        # st.markdown({message["content"]})
         render_message(message["content"], time_str)
         
 # --- チャット入力 ---
@@ -92,10 +81,9 @@ if prompt := st.chat_input("メッセージを入力"):
     current_time = now.strftime("%Y-%m-%d %H:%M:%S")
     st.session_state.messages.append({"role": "user", "content": prompt, "time": current_time,})
     with st.chat_message("user", avatar="👤"):
-        # st.markdown(prompt)
         render_message(prompt, current_time)
 
-    # 固定の雑談返答
+    # # 固定の雑談返答
     if st.session_state.response_index < len(FIXED_BUDDY_RESPONSES):
         response_text = FIXED_BUDDY_RESPONSES[st.session_state.response_index]
         st.session_state.response_index += 1
@@ -107,38 +95,19 @@ if prompt := st.chat_input("メッセージを入力"):
     st.session_state.messages.append({"role": "assistant", "content": final_text, "time": current_time,})
 
 # --- サイドバー ---
-#議事録作成ボタンと会話リセットぼたん
+#議事録作成ボタンと会話リセットボタン
 with st.sidebar:
     st.write("---")
     st.write("メニュー")
     if st.button("✨ 議事録作成"):
-        if st.session_state.messages:
-            # 会話データを送信  
-            save_chat(st.session_state.messages)
-
-            # # --- ここからデバッグ用表示 ---
-            # st.write("### 📤 送信データ(デバッグ用)")
-            # st.json(st.session_state.messages) # リスト形式を綺麗に表示します
-            # # --- ここまで ---
-
-            with st.spinner("整理してるよ..."):
-                try:
-                    payload = {"messages": st.session_state.messages}
-                    res = requests.post(BACKEND_URL, json=payload, timeout=120)
-                    if res.status_code == 200:
-                        st.balloons()
-                        st.markdown("### 📋 整理したメモ")
-                        st.info(res.json().get("minutes"))
-                        st.download_button("保存する", res.json().get("minutes"), "memo.txt")
-                except:
-                    st.error("バックエンドと通信できなかったよ。")
-        else:
+        if not st.session_state.messages:
             st.warning("まだ何も話してないよ。")
-            
+        
+        # --- ここからデバッグ用表示 ---
+        st.write("### 📤 送信データ(デバッグ用)")
+        st.json(st.session_state.messages) # リスト形式を綺麗に表示します
+    
     if st.button("🔄会話リセット"):
-        # 過去の会話漏れセット
-        reset_chat()
-
         st.session_state.messages = []
         st.session_state.response_index = 0
         st.rerun()
